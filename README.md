@@ -30,13 +30,11 @@ You keep full control: nothing is saved until you review the fields and click cr
 ## How it works
 
 ```
-  Capture              Parse                 Review              Create
- ┌─────────┐        ┌──────────┐         ┌────────────┐       ┌──────────────┐
- │ text /  │  ───▶  │  Claude  │  ───▶   │ editable   │  ───▶ │ Google       │
- │ image / │        │ (returns │         │ contact    │       │ People API   │
- │ camera /│        │  JSON)   │         │ fields     │       │ createContact│
- │ URL     │        └──────────┘         └────────────┘       └──────────────┘
- └─────────┘        local machine ────────────────────────▶   your Google account
++--------+   +--------+   +--------+   +--------+
+|Capture |-->|Parse   |-->|Review  |-->|Create  |
+|text,img|   |Claude  |   |edit &  |   |Google  |
+|cam,URL |   |=>JSON  |   |confirm |   |contact |
++--------+   +--------+   +--------+   +--------+
 ```
 
 - **Parsing** is done by **Claude** — by default through the Claude Code CLI on your
