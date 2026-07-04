@@ -9,7 +9,7 @@ It runs entirely on your own machine as a small local web page. The only thing t
 ever leaves your computer is the single parsing call to Claude and the "create
 contact" call to Google.
 
-![Capture a card or signature on the left, review the auto-labelled fields in the middle, and get a link to the new contact on the right.](docs/screenshot.png)
+![A photographed business card dropped on the left, its auto-labelled contact fields in the middle, and the created-contact link on the right.](docs/screenshot.png)
 
 ---
 

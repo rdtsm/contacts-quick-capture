@@ -249,7 +249,7 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
    white-space:pre-wrap;overflow:auto;max-height:280px;background:#fcfcfd;transition:border-color .15s,box-shadow .15s}
  #drop:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
  #drop.empty:before{content:"Paste or drop anything — text, screenshot, image, or a URL";color:#9ca3af}
- img.thumb{max-height:90px;display:block;margin-top:.6rem;border-radius:8px}
+ img.thumb{width:100%;max-height:190px;object-fit:contain;display:block;margin-top:.6rem;border-radius:8px}
  #cam{width:100%;max-height:300px;border-radius:12px;background:#000;margin-top:.6rem}
  .btnrow{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.9rem}
  .btn{font:inherit;font-weight:600;font-size:.92rem;padding:.55rem 1.1rem;border-radius:10px;
