@@ -55,7 +55,8 @@ no markdown fences, using exactly these keys (use "" or [] when unknown):
 {"honorificPrefix":"","givenName":"","familyName":"","company":"","jobTitle":"",
 "phones":[{"value":"","type":"mobile"}],"emails":[{"value":"","type":"work"}],
 "street":"","city":"","region":"","postalCode":"","country":"",
-"website":"","socials":[{"value":"","type":"profile"}],"notes":""}
+"website":"","socials":[{"value":"","type":"profile"}],"notes":"",
+"confidence":100,"parseComment":""}
 
 Rules:
 - phones: one object per number. "type" MUST be one of: mobile, work, home, main,
@@ -73,7 +74,17 @@ Rules:
 - website: the company or personal homepage, NOT a social profile.
 - honorificPrefix: a name title such as Dr., Prof., Mr., Ms., Datuk. Put it ONLY here,
   never in givenName or notes.
-- Put anything useful that fits no field into notes."""
+- confidence: integer 0-100 scoring THIS parse. 90-100: clean input, every
+  visible field extracted unambiguously. 70-89: minor uncertainty (one guessed
+  label, partial address, low-res but readable). 40-69: notable gaps or guesses.
+  Below 40: badly degraded input (blurry, truncated, conflicting).
+- parseComment: one short sentence on anything the user should check. ALWAYS
+  name the specific field and the cause when an item could not be fully
+  identified, e.g. "familyName incomplete - a finger covers part of the card",
+  "postalCode unreadable - left empty", "second phone labelled work by guess -
+  card gives no cue". Empty string when everything parsed cleanly.
+- notes: only information from the input itself. NEVER put parsing-quality
+  remarks in notes - they belong in parseComment."""
 
 
 def _strip_json(text):
@@ -168,7 +179,12 @@ def parse():
     if len(blocks) == 1:
         return jsonify(error="Nothing to parse — paste text, a URL, or drop an image."), 400
     try:
-        return jsonify(claude_parse(blocks))
+        data = claude_parse(blocks)
+        conf = data.get("confidence")
+        data["confidence"] = (max(0, min(100, int(conf)))
+                              if isinstance(conf, (int, float)) else None)
+        data["parseComment"] = str(data.get("parseComment") or "")
+        return jsonify(data)
     except Exception as e:
         return jsonify(error=f"Parsing failed: {e}"), 500
 
@@ -275,6 +291,10 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  .pv{display:flex;gap:.6rem;margin-top:.4rem} .pv input{flex:3} .pv select{flex:2;min-width:0}
  .create{width:100%;margin-top:.7rem;padding:.72rem;font-size:.98rem}
  .hint{font-size:.72rem;color:var(--muted);margin-top:.3rem;text-align:center;min-height:.9rem}
+ .conf{display:none;margin-top:.8rem}
+ .confpill{display:inline-block;font-weight:700;font-size:.8rem;padding:.25rem .7rem;
+   border-radius:999px;color:#fff}
+ .conf .note{margin-top:.35rem;color:var(--muted);font-size:.8rem}
  .okbox .how{margin-top:.45rem;font-size:.8rem;color:var(--muted)}
  #msg{margin-top:1rem;font-size:.92rem;color:var(--muted)} #msg a{color:var(--accent);font-weight:600}
  .err{color:var(--danger)}
@@ -296,6 +316,8 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
 </div>
 <button id="parse" class="btn btn-primary create">Parse contact information</button>
 <canvas id="canvas" style="display:none"></canvas>
+<div id="conf" class="conf"><span id="confpill" class="confpill"></span>
+ <div id="confnote" class="note"></div></div>
 <div id="msg"></div>
 </div>
 <div class="col">
@@ -333,6 +355,19 @@ const drop=document.getElementById('drop'),msg=document.getElementById('msg');
 let imageBlob=null;
 function showErr(t){msg.textContent='';const s=document.createElement('span');
   s.className='err';s.textContent=t;msg.appendChild(s);}
+// parse-confidence widget: pill green>=80 / amber>=50 / red below, plus comment
+const confEl=document.getElementById('conf'),confPill=document.getElementById('confpill'),
+  confNote=document.getElementById('confnote');
+function hideConf(){confEl.style.display='none';}
+function showConf(score,comment){
+  if(typeof score!=='number'){hideConf();return;}
+  confPill.style.background=score>=80?'#137333':score>=50?'#b45309':'#b91c1c';
+  confPill.textContent='Parse confidence: '+score+'%';
+  let note=comment||'';
+  if(score<50)note+=(note?' — ':'')+'Consider a sharper capture.';
+  confNote.textContent=note;confNote.style.display=note?'block':'none';
+  confEl.style.display='block';
+}
 // server-injected Google auth state: ready | needs-auth | needs-setup
 const GOOGLE_STATE='__GOOGLE_STATE__',gstate=document.getElementById('gstate');
 if(GOOGLE_STATE==='needs-auth')gstate.textContent='requires Google auth';
@@ -390,7 +425,7 @@ document.getElementById('snap').onclick=()=>{
 
 document.getElementById('parse').onclick=async()=>{
   const btn=document.getElementById('parse');
-  btn.disabled=true; msg.textContent='Parsing…';
+  btn.disabled=true; msg.textContent='Parsing…'; hideConf();
   const fd=new FormData();
   fd.append('text',drop.textContent.trim());
   if(imageBlob) fd.append('image',imageBlob,'image.png');
@@ -406,7 +441,8 @@ document.getElementById('parse').onclick=async()=>{
   const my=new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
   const nEl=document.getElementById('notes'); nEl.value=my+(nEl.value?'\\n'+nEl.value:'');
   parsed=true; refreshCreate();
-  if(hasAnyData())msg.textContent='Review, edit if needed, then create.';
+  showConf(d.confidence,d.parseComment);
+  if(hasAnyData())msg.textContent='Review, edit if needed, then save.';
   else showErr('No contact info found — edit fields or try again.');
 };
 function collectContact(){
@@ -485,7 +521,7 @@ function resetForm(){
   document.getElementById('socials').value='';
   fillRows('phones',[]); fillRows('emails',[]);
   drop.textContent='';imageBlob=null;drop.classList.add('empty');stopCam();
-  parsed=false; refreshCreate();
+  parsed=false; refreshCreate(); hideConf();
 }
 document.getElementById('clear').onclick=()=>{resetForm();msg.textContent='';};
 
