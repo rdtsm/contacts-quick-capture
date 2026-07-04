@@ -219,7 +219,13 @@ def create():
 
 @app.get("/")
 def index():
-    return HTML
+    if os.path.exists(os.path.join(HERE, "token.json")):
+        state = "ready"           # authorized — Google button shows normal
+    elif os.path.exists(os.path.join(HERE, "credentials.json")):
+        state = "needs-auth"      # first create will open the Google sign-in
+    else:
+        state = "needs-setup"     # no OAuth client — Google path unavailable
+    return HTML.replace("__GOOGLE_STATE__", state)
 
 # ---------------------------------------------------------------- UI
 HTML = """<!doctype html><html><head><meta charset="utf-8">
@@ -268,12 +274,14 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  .row{display:flex;gap:.6rem} .row>div{flex:1} .narrow{flex:.55!important}
  .pv{display:flex;gap:.6rem;margin-top:.4rem} .pv input{flex:3} .pv select{flex:2;min-width:0}
  .create{width:100%;margin-top:.7rem;padding:.72rem;font-size:.98rem}
+ .hint{font-size:.72rem;color:var(--muted);margin-top:.3rem;text-align:center;min-height:.9rem}
+ .okbox .how{margin-top:.45rem;font-size:.8rem;color:var(--muted)}
  #msg{margin-top:1rem;font-size:.92rem;color:var(--muted)} #msg a{color:var(--accent);font-weight:600}
  .err{color:var(--danger)}
 </style></head><body>
 <div class="card">
 <h1>Contacts quick capture to Google</h1>
-<p class="sub">Take picture, drop screenshot, image, text, URL and parse. Create Google Contact after review.</p>
+<p class="sub">Take picture, drop screenshot, image, text, URL and parse. Save as Google Contact or vCard after review.</p>
 <div class="cols">
 <div class="col">
 <div id="drop" class="empty" contenteditable="true"></div>
@@ -307,12 +315,16 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  <div class="row"><div><label>Website</label><input id="website"></div>
    <div><label>Social profiles</label><input id="socials"></div></div>
  <label>Notes</label><textarea id="notes" rows="2"></textarea>
- <button id="create" class="btn btn-primary create" disabled>Create Google Contact</button>
+ <div class="actions2">
+  <div><button id="create" class="btn btn-primary create" disabled>Create Google Contact</button>
+   <div id="gstate" class="hint"></div></div>
+  <div><button id="vcard" class="btn btn-primary create" disabled>Download vCard</button></div>
+ </div>
 </div>
 </div>
 <div class="col success-col">
-<div class="lbl">Last created contact</div>
-<div id="success"><div class="ph">Your created contact and its link appear here after you push to Google.</div></div>
+<div class="lbl">Last saved contact</div>
+<div id="success"><div class="ph">Your saved contact appears here after you create it in Google or download a vCard.</div></div>
 </div>
 </div>
 </div>
@@ -321,6 +333,10 @@ const drop=document.getElementById('drop'),msg=document.getElementById('msg');
 let imageBlob=null;
 function showErr(t){msg.textContent='';const s=document.createElement('span');
   s.className='err';s.textContent=t;msg.appendChild(s);}
+// server-injected Google auth state: ready | needs-auth | needs-setup
+const GOOGLE_STATE='__GOOGLE_STATE__',gstate=document.getElementById('gstate');
+if(GOOGLE_STATE==='needs-auth')gstate.textContent='requires Google auth';
+if(GOOGLE_STATE==='needs-setup')gstate.textContent='requires Google setup — see README';
 const SIMPLE=['honorificPrefix','givenName','familyName','company','jobTitle','street','city',
   'region','postalCode','country','website','notes'];
 const PHONE_TYPES=[['mobile','Mobile'],['work','Work'],['home','Home'],['main','Main'],
@@ -393,20 +409,75 @@ document.getElementById('parse').onclick=async()=>{
   if(hasAnyData())msg.textContent='Review, edit if needed, then create.';
   else showErr('No contact info found — edit fields or try again.');
 };
-document.getElementById('create').onclick=async()=>{
-  document.getElementById('create').disabled=true;   // no double-create
-  msg.textContent='Creating… (first run opens a Google login window in your browser)';
+function collectContact(){
   const c={}; for(const f of SIMPLE)c[f]=document.getElementById(f).value.trim();
   c.phones=collectRows('phones'); c.emails=collectRows('emails');
   c.socials=document.getElementById('socials').value.split(',').map(s=>s.trim())
     .filter(Boolean).map(v=>({value:v,type:'profile'}));
+  return c;
+}
+function successBox(title,...nodes){
+  const box=document.createElement('div');box.className='okbox';
+  const ok=document.createElement('div');ok.className='ok';ok.textContent=title;
+  box.append(ok,...nodes);
+  const s=document.getElementById('success');s.innerHTML='';s.appendChild(box);
+}
+document.getElementById('create').onclick=async()=>{
+  document.getElementById('create').disabled=true;   // no double-create
+  msg.textContent='Creating… (first run opens a Google login window in your browser)';
   let d;
   try{const r=await fetch('/create',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(c)}); d=await r.json();}
+    body:JSON.stringify(collectContact())}); d=await r.json();}
   catch(e){showErr('Request failed: '+e.message);refreshCreate();return;}
   if(d.error){showErr(d.error);refreshCreate();return;}
-  document.getElementById('success').innerHTML='<div class="okbox"><div class="ok">✓ Contact created</div>'
-    +'<a href="'+d.link+'" target="_blank">Open in Google Contacts →</a></div>';
+  const a=document.createElement('a');a.href=d.link;a.target='_blank';
+  a.textContent='Open in Google Contacts →';
+  successBox('✓ Contact created',a);
+  gstate.textContent='';   // a create succeeded, so auth is done
+  resetForm(); msg.textContent='';
+};
+
+// vCard export — the zero-setup path: built client-side, imports anywhere
+const BS=String.fromCharCode(92);  // backslash, kept out of literals in this embedded JS
+function vesc(s){return String(s).split(BS).join(BS+BS).split(';').join(BS+';')
+  .split(',').join(BS+',').split('\\n').join(BS+'n');}
+const TELMAP={mobile:'CELL',work:'WORK',home:'HOME',workFax:'WORK,FAX',homeFax:'HOME,FAX',
+  pager:'PAGER',workMobile:'WORK,CELL',main:'VOICE',other:'VOICE'};
+function buildVcard(c){
+  const L=['BEGIN:VCARD','VERSION:3.0'];
+  L.push('N:'+[c.familyName,c.givenName,'',c.honorificPrefix,''].map(vesc).join(';'));
+  L.push('FN:'+vesc([c.honorificPrefix,c.givenName,c.familyName].filter(Boolean).join(' ')
+    ||c.company||'Contact'));
+  if(c.company)L.push('ORG:'+vesc(c.company));
+  if(c.jobTitle)L.push('TITLE:'+vesc(c.jobTitle));
+  for(const p of c.phones)L.push('TEL;TYPE='+(TELMAP[p.type]||'VOICE')+':'+vesc(p.value));
+  for(const e of c.emails)L.push('EMAIL'+(e.type==='other'?'':';TYPE='+e.type.toUpperCase())
+    +':'+vesc(e.value));
+  if(c.street||c.city||c.region||c.postalCode||c.country)
+    L.push('ADR:;;'+[c.street,c.city,c.region,c.postalCode,c.country].map(vesc).join(';'));
+  if(c.website)L.push('URL:'+vesc(c.website));
+  for(const s of c.socials)L.push('URL:'+vesc(s.value));
+  if(c.notes)L.push('NOTE:'+vesc(c.notes));
+  L.push('END:VCARD');
+  return L.join('\\r\\n')+'\\r\\n';
+}
+let vcardUrl=null;
+document.getElementById('vcard').onclick=()=>{
+  const c=collectContact();
+  const name=[c.givenName,c.familyName].filter(Boolean).join(' ');
+  const file=((name||'contact').toLowerCase().split(' ').join('-'))+'.vcf';
+  if(vcardUrl)URL.revokeObjectURL(vcardUrl);
+  vcardUrl=URL.createObjectURL(new Blob([buildVcard(c)],{type:'text/vcard'}));
+  const a=document.createElement('a');a.href=vcardUrl;a.download=file;a.click();
+  const info=document.createElement('div');info.textContent=(name?name+' — ':'')+file;
+  const again=document.createElement('a');again.href=vcardUrl;again.download=file;
+  again.textContent='Download again';
+  const againWrap=document.createElement('div');againWrap.appendChild(again);
+  const how=document.createElement('div');how.className='how';
+  how.append('Import: double-click (Apple Contacts), or ');
+  const g=document.createElement('a');g.href='https://contacts.google.com';g.target='_blank';
+  g.textContent='contacts.google.com';how.append(g,' → Import.');
+  successBox('✓ vCard downloaded',info,againWrap,how);
   resetForm(); msg.textContent='';
 };
 function resetForm(){
@@ -430,7 +501,9 @@ function hasAnyData(){
       if(inp.value.trim())return true;
   return false;
 }
-function refreshCreate(){document.getElementById('create').disabled=!(parsed&&hasAnyData());}
+function refreshCreate(){const ok=parsed&&hasAnyData();
+  document.getElementById('create').disabled=!ok||GOOGLE_STATE==='needs-setup';
+  document.getElementById('vcard').disabled=!ok;}
 const formEl=document.getElementById('form');
 formEl.addEventListener('input',refreshCreate); formEl.addEventListener('change',refreshCreate);
 // initial state: empty labelled rows visible, Create disabled

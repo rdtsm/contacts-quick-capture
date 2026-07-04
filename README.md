@@ -1,9 +1,10 @@
 # Contacts quick capture to Google
 
 Turn any messy contact detail — a business-card photo, an email signature, a
-screenshot, or a URL — into a clean, correctly-labelled **Google Contact** in about
+screenshot, or a URL — into a clean, correctly-labelled contact in about
 15 seconds. You drop it in, Claude structures it, you glance and confirm, and it's
-saved to your Google account.
+saved — **straight into your Google account**, or as a **vCard (.vcf) download**
+that needs zero setup and imports into any contacts app.
 
 It runs entirely on your own machine as a small local web page. The only thing that
 ever leaves your computer is the single parsing call to Claude and the "create
@@ -40,8 +41,10 @@ You keep full control: nothing is saved until you review the fields and click cr
 - **Parsing** is done by **Claude** — by default through the Claude Code CLI on your
   Claude subscription (no API key, no per-contact cost); optionally through the
   Anthropic API with a key.
-- **Saving** uses the **Google People API** `createContact`, writing to whichever
-  Google account you authorize once.
+- **Saving** has two paths: one-click **Google People API** `createContact`
+  (one-time OAuth setup, writes to whichever account you authorize), or a
+  **vCard (.vcf) download** with zero configuration — see
+  [Two ways to save](#two-ways-to-save).
 - Everything else — the web page, your review, the image handling — runs locally on
   `localhost`.
 
@@ -63,8 +66,28 @@ Fields Claude extracts, and the Google Contacts label each maps to:
 | Social profiles | LinkedIn / X / GitHub / … stored as URLs labelled **Profile** (Google has no dedicated social field) |
 | Notes | auto-prefixed with the capture month + year (e.g. `Jul 2026`) as the first line, so you always know when you saved a contact |
 
-The **Create Google Contact** button stays disabled until you've parsed *and* there's
-at least one real field of data, so you can't accidentally save an empty contact.
+The save buttons stay disabled until you've parsed *and* there's at least one real
+field of data, so you can't accidentally save an empty contact.
+
+---
+
+## Two ways to save
+
+| | **Download vCard** (zero setup) | **Create Google Contact** (one-time setup) |
+|---|---|---|
+| Setup | none | ~15 min Google OAuth client (setup step 3) |
+| Per contact | download `.vcf`, then import: double-click (Apple Contacts) or [contacts.google.com](https://contacts.google.com) → Import | one click — contact lands in your account, with a direct link |
+| Works with | Google, Apple, Outlook — anything that reads vCards | Google Contacts |
+
+Start with **Download vCard** — it works the moment the app runs. Set up the
+Google path when you want true one-click saving; until then the Google button
+shows *"requires Google setup"*.
+
+> **Why is there no zero-setup Google login?** Writing contacts is a Google
+> *sensitive scope*: Google only shows its consent window to apps with a
+> registered (and, for strangers, verified) OAuth client. For an open-source
+> tool running on your machine, that registration is yours to make — once,
+> in ~15 minutes. The vCard path exists so you never have to.
 
 ---
 
@@ -73,7 +96,7 @@ at least one real field of data, so you can't accidentally save an empty contact
 | What | Why | Notes |
 |---|---|---|
 | **Python 3.10+** | runs the local server | 3.9 works but Google libraries warn it's end-of-life |
-| **A Google account** | where contacts are saved | a **Google Workspace** account is strongly recommended (see setup) |
+| **A Google account** | where contacts are saved | **Google API path only** — a **Google Workspace** account is strongly recommended (see setup); the vCard path needs no Google setup |
 | **A parsing engine** | reads the input | either the **Claude Code CLI** signed in to a Claude plan (default), **or** an **Anthropic API key** |
 | **Python packages** | `flask`, `requests`, `google-auth-oauthlib`, `google-api-python-client` | installed via `requirements.txt` |
 | A modern browser | the UI + camera | camera capture uses the browser's webcam over `localhost` |
@@ -109,7 +132,9 @@ export ANTHROPIC_API_KEY=sk-ant-...   # add to ~/.zshrc so it persists
 
 If the key is set, the app uses the API; otherwise it uses the Claude Code CLI.
 
-### 3. Create Google OAuth credentials (~10 min)
+### 3. Create Google OAuth credentials (~10 min — Google API path only)
+
+Skip this step entirely if the vCard path is enough for you.
 
 Do this on a **Google Workspace** account so the OAuth app can be **Internal** —
 which means no token expiry, no Google verification, and no "unverified app" warning,
@@ -148,8 +173,10 @@ Per contact (~15 s):
    click **📷 Camera** to photograph a card, or paste a URL.
 2. **Parse contact information** — Claude fills the fields.
 3. **Review** — correct anything; adjust phone/email labels via the dropdowns.
-4. **Create Google Contact** — a success message with a link to the new contact
-   appears, and the form clears for the next one. **Clear** resets it manually.
+4. **Save** — click **Create Google Contact** (one click, direct link to the new
+   contact) or **Download vCard** (import the `.vcf` into any contacts app). A
+   success message appears and the form clears for the next one. **Clear** resets
+   it manually.
 
 | Event | What happens |
 |---|---|
@@ -187,9 +214,10 @@ as above. No code change is needed.
 
 - **Local only.** The server binds to `127.0.0.1:8321` and is not reachable from your
   network. The web page, image handling, and review all happen on your machine.
-- **What leaves your machine:** exactly two calls — the contact text/image to **Claude**
-  for parsing, and the final `createContact` to **Google**. Nothing else is uploaded or
-  stored remotely.
+- **What leaves your machine:** at most two calls — the contact text/image to **Claude**
+  for parsing, and (Google path only) the final `createContact` to **Google**. The
+  vCard path sends nothing to Google at all: the file is generated in your browser.
+  Nothing else is uploaded or stored remotely.
 - **Cross-site protection.** POST endpoints reject requests whose `Origin` isn't the
   app's own page, so a random website can't drive your local server.
 - **`credentials.json`** (your OAuth client secret) and **`token.json`** (your saved
@@ -210,6 +238,8 @@ as above. No code change is needed.
   500 KB.)
 - **One image per capture** — pasting or capturing a second image replaces the first.
 - **No duplicate detection** — Google Contacts' built-in "Merge & fix" handles dupes.
+- **vCard path** — one manual import step per contact, and no direct link to the
+  saved contact.
 - Extra phone/email rows beyond what Claude finds aren't added in the UI — add or edit
   them in Google Contacts afterward.
 - **Basic accessibility** — form labels aren't wired to inputs for screen readers.
