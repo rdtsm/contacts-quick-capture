@@ -171,8 +171,11 @@ Per contact (~15 s):
 
 1. **Capture** into the drop box — paste text (⌘V), paste/drop a screenshot or image,
    click **📷 Camera** to photograph a card, or paste a URL.
-2. **Parse contact information** — Claude fills the fields.
+2. **Parse contact information** — Claude fills the fields and shows a
+   colour-coded **parse confidence** (green / amber / red) with a note naming
+   any field it couldn't fully read (e.g. a finger covering the card).
 3. **Review** — correct anything; adjust phone/email labels via the dropdowns.
+   On a red score, recapturing is usually faster than fixing fields.
 4. **Save** — click **Create Google Contact** (one click, direct link to the new
    contact) or **Download vCard** (import the `.vcf` into any contacts app). A
    success message appears and the form clears for the next one. **Clear** resets
@@ -244,7 +247,8 @@ as above. No code change is needed.
   them in Google Contacts afterward.
 - **Basic accessibility** — form labels aren't wired to inputs for screen readers.
 - Parsing quality depends on the input's legibility (a sharp, well-framed card photo
-  parses best).
+  parses best) — the confidence score after each parse flags this, but it is the
+  model's self-assessment: trust the colour band, not the exact number.
 
 ---
 
