@@ -1,0 +1,15 @@
+# secrets — never commit
+credentials.json
+token.json
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# macos
+.DS_Store
+
+# claude code local dev files (machine-specific)
+.claude/
