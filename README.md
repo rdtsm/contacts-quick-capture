@@ -2,13 +2,16 @@
 
 Turn any messy contact detail — a business-card photo, an email signature, a
 screenshot, or a URL — into a clean, correctly-labelled contact in about
-15 seconds. You drop it in, Claude structures it, you glance and confirm, and it's
-saved — **straight into your Google account**, or as a **vCard (.vcf) download**
-that needs zero setup and imports into any contacts app.
+15 seconds: drop it in, Claude structures it, you glance and confirm, done.
 
-It runs entirely on your own machine as a small local web page. The only thing that
-ever leaves your computer is the single parsing call to Claude and the "create
-contact" call to Google.
+- **Zero typing** — Claude reads cards, signatures, screenshots, and URLs, and maps
+  every phone, email, and address to the right contact label.
+- **You stay in control** — review editable fields before anything is saved; a
+  colour-coded confidence score flags anything the parse couldn't fully read.
+- **Two ways to save** — one click straight into your Google account (one-time
+  setup), or a zero-setup **vCard (.vcf)** download that imports anywhere.
+- **Private by design** — a small local web page on your machine; only the parsing
+  call to Claude (and, on the Google path, the save call) ever leaves it.
 
 ![A photographed business card dropped on the left, its auto-labelled contact fields in the middle, and the created-contact link on the right.](docs/screenshot.png)
 
