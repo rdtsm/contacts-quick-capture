@@ -259,8 +259,19 @@ as above. No code change is needed.
 
 - **Auto-start at login** — a macOS LaunchAgent so `localhost:8321` is always live and
   you never restart the server manually.
-- **Duplicate detection** — look up existing contacts by email/phone before creating and
-  offer to update instead.
+- **Duplicate hints** *(under consideration — not decided)* — after parsing, mark any
+  field that already exists in your Google Contacts with a subtle dot, so you spot a
+  duplicate before creating one. Advisory only: Create stays enabled.
+  *Sketch:* search the People API (`people.searchContacts`) for the last name, each
+  email and each phone; pool the returned candidates; re-check them exactly on the
+  server, comparing phones via Google's `canonicalForm` (E.164). A dot can therefore
+  never be wrong — the only failure mode is a duplicate that goes unflagged, since
+  Google matches only from the *start* of a stored number.
+  *Trade-off:* the app would begin **reading** contacts, so the "only ever calls
+  `createContact`" guarantee in [Privacy & security](#privacy--security) would no
+  longer hold. The existing OAuth scope already permits it, so no re-authorization.
+- **Duplicate merge** — the step beyond hints: offer to update the matched contact
+  instead of creating a new one.
 - **Lower-friction capture** — a macOS Share/Quick Action or menu-bar shortcut that
   sends the clipboard/selection straight to parsing, skipping the browser tab.
 
