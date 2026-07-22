@@ -338,7 +338,7 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  <div class="row"><div><label>City</label><input id="city"></div>
    <div><label>Region/State</label><input id="region"></div>
    <div><label>Postcode</label><input id="postalCode"></div></div>
- <label>Country</label><input id="country">
+ <label>Country</label><input id="country"><input id="countryCode" type="hidden">
  <div class="row"><div><label>Website</label><input id="website"></div>
    <div><label>Social profiles</label><input id="socials"></div></div>
  <label>Notes</label><textarea id="notes" rows="2"></textarea>
@@ -378,7 +378,7 @@ const GOOGLE_STATE='__GOOGLE_STATE__',gstate=document.getElementById('gstate');
 if(GOOGLE_STATE==='needs-auth')gstate.textContent='requires Google auth';
 if(GOOGLE_STATE==='needs-setup')gstate.textContent='requires Google setup — see README';
 const SIMPLE=['honorificPrefix','givenName','familyName','company','jobTitle','street','city',
-  'region','postalCode','country','website','notes'];
+  'region','postalCode','country','countryCode','website','notes'];
 const PHONE_TYPES=[['mobile','Mobile'],['work','Work'],['home','Home'],['main','Main'],
   ['workMobile','Work mobile'],['workFax','Work fax'],['homeFax','Home fax'],
   ['pager','Pager'],['other','Other']];
