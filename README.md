@@ -64,7 +64,7 @@ Fields Claude extracts, and the Google Contacts label each maps to:
 | Company / Title | |
 | Phones | each numbered line gets a Google label: **Mobile**, **Work**, **Work fax**, **Home**, **Main**, … |
 | Emails | labelled, defaulting to **Work** |
-| Address | street, city, region/state, postcode, country |
+| Address | street, city, region/state, postcode, country + ISO country code (both shown, kept in sync so Google's read and edit views agree) |
 | Website | stored as a URL labelled **Home page** |
 | Social profiles | LinkedIn / X / GitHub / … stored as URLs labelled **Profile** (Google has no dedicated social field) |
 | Notes | auto-prefixed with the capture month + year (e.g. `Jul 2026`) as the first line, so you always know when you saved a contact |
@@ -101,7 +101,7 @@ shows *"requires Google setup"*.
 | **Python 3.10+** | runs the local server | 3.9 works but Google libraries warn it's end-of-life |
 | **A Google account** | where contacts are saved | **Google API path only** — a **Google Workspace** account is strongly recommended (see setup); the vCard path needs no Google setup |
 | **A parsing engine** | reads the input | either the **Claude Code CLI** signed in to a Claude plan (default), **or** an **Anthropic API key** |
-| **Python packages** | `flask`, `requests`, `google-auth-oauthlib`, `google-api-python-client` | installed via `requirements.txt` |
+| **Python packages** | `flask`, `requests`, `google-auth-oauthlib` | installed via `requirements.txt`; versions are deliberately unpinned — a fresh install gets the latest releases. If an update ever misbehaves, pin that package (e.g. `flask==3.1.0`) in `requirements.txt` |
 | A modern browser | the UI + camera | camera capture uses the browser's webcam over `localhost` |
 
 > **Platform:** the browser app runs anywhere Python and a browser run. The shell
@@ -198,6 +198,9 @@ Per contact (~15 s):
 - **Update to the latest version:** `git pull`, then restart the server.
 - **Restart the server:** rerun `./.venv/bin/python app.py`. The dev server stops on
   logout/restart; re-running is the only step.
+- **After changing `app.py`, run the regression tests:** `./.venv/bin/pip install pytest`
+  (once), then `./.venv/bin/python -m pytest -q`. They check the field wiring between
+  the form and the server, and the mapping to Google's contact format.
 - **Change the parsing model / cost:** edit `CLI_MODEL` (subscription path, default
   `sonnet`) or `CLAUDE_MODEL` (API path, default `claude-haiku-4-5`) near the top of
   `app.py`.

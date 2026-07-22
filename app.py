@@ -27,11 +27,13 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # bound uploaded image size
 
 # ---------------------------------------------------------------- google auth
-def google_service():
-    from google.auth.transport.requests import Request
+def google_session():
+    """OAuth'd HTTP session for the People API; auto-refreshes the access token.
+    A dead refresh token (revoked, or expired 7-day test token) falls back to a
+    fresh browser sign-in instead of erroring."""
+    from google.auth.transport.requests import AuthorizedSession, Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from googleapiclient.discovery import build
 
     token_path = os.path.join(HERE, "token.json")
     creds = None
@@ -39,15 +41,18 @@ def google_service():
         creds = Credentials.from_authorized_user_file(token_path, SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                creds = None
+        if not creds or not creds.valid:
             flow = InstalledAppFlow.from_client_secrets_file(
                 os.path.join(HERE, "credentials.json"), SCOPES)
             creds = flow.run_local_server(port=0)
         with open(token_path, "w") as f:
             f.write(creds.to_json())
         os.chmod(token_path, 0o600)  # token is a real credential — owner-only
-    return build("people", "v1", credentials=creds)
+    return AuthorizedSession(creds)
 
 # ---------------------------------------------------------------- claude parsing
 PROMPT = """Extract contact information from the input. Respond with ONLY a JSON object,
@@ -145,8 +150,12 @@ def claude_parse(content_blocks):
 def fetch_url_text(url):
     resp = requests.get(url, timeout=20, stream=True, headers={
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
+    resp.raise_for_status()  # a 404/login page is not the contact
     raw = resp.raw.read(500_000, decode_content=True)  # cap download; text is cut to 15k below
-    html = raw.decode(resp.encoding or "utf-8", "replace")
+    # without a charset header requests guesses ISO-8859-1 — assume utf-8 instead
+    enc = (resp.encoding if "charset=" in resp.headers.get("content-type", "").lower()
+           else "utf-8")
+    html = raw.decode(enc or "utf-8", "replace")
     html = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", " ", html)
     return re.sub(r"\s+", " ", text)[:15000]
@@ -163,11 +172,21 @@ def _same_origin_only():
             return jsonify(error="Cross-origin request blocked."), 403
 
 
+@app.errorhandler(413)
+def _too_large(e):
+    # JSON instead of Werkzeug's HTML page, so the UI shows a clear message
+    return jsonify(error="Image too large — the limit is 20 MB."), 413
+
+
 @app.post("/parse")
 def parse():
     blocks = [{"type": "text", "text": PROMPT}]
     img = request.files.get("image")
     text = (request.form.get("text") or "").strip()
+    if img and (img.mimetype or "") not in ("image/jpeg", "image/png",
+                                            "image/gif", "image/webp"):
+        return jsonify(error=f"Unsupported image type ({img.mimetype}) — "
+                             "use JPEG, PNG, GIF or WebP."), 400
     if img:
         blocks.append({"type": "image", "source": {
             "type": "base64",
@@ -184,18 +203,18 @@ def parse():
         return jsonify(error="Nothing to parse — paste text, a URL, or drop an image."), 400
     try:
         data = claude_parse(blocks)
-        conf = data.get("confidence")
-        data["confidence"] = (max(0, min(100, int(conf)))
-                              if isinstance(conf, (int, float)) else None)
+        try:  # tolerate "90" / 90.0 / junk
+            data["confidence"] = max(0, min(100, int(float(data.get("confidence")))))
+        except (TypeError, ValueError):
+            data["confidence"] = None
         data["parseComment"] = str(data.get("parseComment") or "")
         return jsonify(data)
     except Exception as e:
         return jsonify(error=f"Parsing failed: {e}"), 500
 
 
-@app.post("/create")
-def create():
-    c = request.get_json(force=True)
+def contact_body(c):
+    """Map the reviewed form fields to a People API person body."""
     body = {}
     if c.get("givenName") or c.get("familyName") or c.get("honorificPrefix"):
         body["names"] = [{"honorificPrefix": c.get("honorificPrefix", ""),
@@ -228,11 +247,20 @@ def create():
         body["urls"] = urls
     if c.get("notes"):
         body["biographies"] = [{"value": c["notes"]}]
+    return body
+
+
+@app.post("/create")
+def create():
+    body = contact_body(request.get_json(force=True))
     if not body:
         return jsonify(error="All fields empty — nothing to create."), 400
     try:
-        person = google_service().people().createContact(body=body).execute()
-        rid = person["resourceName"].split("/")[-1]
+        r = google_session().post(
+            "https://people.googleapis.com/v1/people:createContact", json=body)
+        if r.status_code != 200:
+            return jsonify(error=f"Google Contacts error: {r.status_code} — {r.text[:300]}"), 500
+        rid = r.json()["resourceName"].split("/")[-1]
         return jsonify(ok=True, link=f"https://contacts.google.com/person/{rid}")
     except Exception as e:
         return jsonify(error=f"Google Contacts error: {e}"), 500
@@ -338,7 +366,8 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  <div class="row"><div><label>City</label><input id="city"></div>
    <div><label>Region/State</label><input id="region"></div>
    <div><label>Postcode</label><input id="postalCode"></div></div>
- <label>Country</label><input id="country"><input id="countryCode" type="hidden">
+ <div class="row"><div><label>Country</label><input id="country"></div>
+   <div class="narrow"><label>ISO code</label><input id="countryCode"></div></div>
  <div class="row"><div><label>Website</label><input id="website"></div>
    <div><label>Social profiles</label><input id="socials"></div></div>
  <label>Notes</label><textarea id="notes" rows="2"></textarea>
@@ -399,7 +428,9 @@ function fillRows(kind,arr){const c=document.getElementById(kind);c.innerHTML=''
 function collectRows(kind){return [...document.getElementById(kind).querySelectorAll('.row')]
   .map(r=>({value:r.querySelector('input').value.trim(),type:r.querySelector('select').value}))
   .filter(x=>x.value);}
-drop.addEventListener('input',()=>drop.classList.toggle('empty',!drop.textContent.trim()&&!imageBlob));
+drop.addEventListener('input',()=>{
+  if(imageBlob&&!drop.querySelector('img.thumb'))imageBlob=null; // thumbnail deleted by hand
+  drop.classList.toggle('empty',!drop.textContent.trim()&&!imageBlob);});
 function addImage(blob){imageBlob=blob;   // one image per capture — a new one replaces it
   const old=drop.querySelector('img.thumb');if(old){URL.revokeObjectURL(old.src);old.remove();}
   const i=document.createElement('img');i.className='thumb';
