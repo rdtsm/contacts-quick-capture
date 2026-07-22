@@ -262,6 +262,12 @@ as above. No code change is needed.
 
 - **Auto-start at login** — a macOS LaunchAgent so `localhost:8321` is always live and
   you never restart the server manually.
+- **Mobile capture (Android/iPhone)** — use the phone as a client of the Mac server.
+  *Sketch:* reach the Mac over a private [Tailscale](https://tailscale.com) tunnel
+  (`tailscale serve` provides the HTTPS the mobile camera requires; nothing is exposed
+  to the internet, so the privacy posture holds), and add a "Choose photo" file input —
+  on Android that button natively offers camera-or-gallery. Requires the Mac to be
+  awake and serving, which makes the LaunchAgent above the natural companion.
 - **Duplicate hints** *(under consideration — not decided)* — after parsing, mark any
   field that already exists in your Google Contacts with a subtle dot, so you spot a
   duplicate before creating one. Advisory only: Create stays enabled.
