@@ -13,7 +13,7 @@ screenshot, or a URL — into a clean, correctly-labelled contact in about
 - **Private by design** — a small local web page on your machine; only the parsing
   call to Claude (and, on the Google path, the save call) ever leaves it.
 
-![A photographed business card dropped on the left with a green parse-confidence score, its auto-labelled contact fields and the two save buttons in the middle, and the saved-contact link on the right.](docs/screenshot.png)
+![The three-step flow: a photographed business card dropped in Capture with a green parse-confidence score, its auto-labelled contact fields and the two save buttons in Edit & create, and the saved contact with its Open Google contact button in View.](docs/screenshot.png)
 
 ---
 

@@ -280,7 +280,7 @@ def index():
 HTML = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📇</text></svg>">
-<title>Contacts quick capture to Google</title>
+<title>Contacts quick capture</title>
 <style>
  :root{--accent:#2563eb;--accent-h:#1d4ed8;--bg:#f4f5f7;--card:#fff;--text:#1f2937;
    --muted:#6b7280;--border:#e5e7eb;--field:#d1d5db;--danger:#b91c1c}
@@ -290,53 +290,62 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
    align-items:flex-start;padding:1.5rem 1rem;line-height:1.4}
  .card{background:var(--card);width:min(1140px,100%);border:1px solid var(--border);border-radius:16px;
    box-shadow:0 1px 3px rgba(0,0,0,.06),0 10px 30px rgba(0,0,0,.05);padding:1.4rem 1.6rem}
- .cols{display:grid;grid-template-columns:1fr 1fr .6fr;gap:1.4rem;margin-top:1rem;align-items:start}
+ .cols{display:grid;grid-template-columns:1fr 1.2fr .6fr;gap:1rem;margin-top:1rem;align-items:start}
+ .col{border:1px solid var(--border);border-radius:12px;background:#fff;overflow:hidden}
+ .colhead{display:flex;align-items:center;gap:.55rem;background:#f8f9fb;border-bottom:1px solid var(--border);
+   padding:.6rem .9rem;font-size:.92rem;text-transform:uppercase;letter-spacing:.03em;
+   color:var(--muted);font-weight:600}
+ .step{display:inline-flex;align-items:center;justify-content:center;width:1.45rem;height:1.45rem;
+   border-radius:50%;background:var(--accent);color:#fff;font-size:.85rem;font-weight:600}
+ .colbody{padding:.9rem 1rem}
  @media(max-width:900px){.cols{grid-template-columns:1fr}}
  .actions2{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.9rem}
- .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:.4rem}
  .ph{color:var(--muted);font-size:.85rem;border:1px dashed var(--border);border-radius:12px;padding:1.1rem;text-align:center}
- .okbox{border:1px solid #cbe5cf;background:#f2fbf4;border-radius:12px;padding:1rem;font-size:.9rem}
+ .okbox{font-size:.92rem}
  .okbox .ok{color:#137333;font-weight:700;margin-bottom:.35rem}
+ .okbox .name{font-weight:600}
  .okbox a{color:var(--accent);font-weight:600;word-break:break-word}
  h1{font-size:1.35rem;margin:0 0 .2rem;letter-spacing:-.01em}
- .sub{margin:0 0 1.1rem;color:var(--muted);font-size:.9rem}
  #drop{border:2px dashed #cbd5e1;border-radius:12px;padding:1.1rem;min-height:190px;outline:none;
    white-space:pre-wrap;overflow:auto;max-height:280px;background:#fcfcfd;transition:border-color .15s,box-shadow .15s}
  #drop:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
- #drop.empty:before{content:"Paste or drop anything — text, screenshot, image, or a URL";color:#9ca3af}
+ #drop.empty:before{content:"Paste or drop any contact information — text, screenshot, image, URL, or take direct photo";color:#9ca3af}
  img.thumb{width:100%;max-height:190px;object-fit:contain;display:block;margin-top:.6rem;border-radius:8px}
  #cam{width:100%;max-height:300px;border-radius:12px;background:#000;margin-top:.6rem}
  .btnrow{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.9rem}
  .btn{font:inherit;font-weight:600;font-size:.92rem;padding:.55rem 1.1rem;border-radius:10px;
    border:1px solid transparent;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
- .btn-primary{background:var(--accent);color:#fff} .btn-primary:hover{background:var(--accent-h)}
- .btn-ghost{background:#fff;color:var(--text);border-color:var(--field)} .btn-ghost:hover{background:#f9fafb}
+ .btn-primary{background:var(--accent);color:#fff} .btn-primary:hover{background:var(--accent-h)} .btn-ghost{background:#fff;color:var(--text);border-color:var(--field)} .btn-ghost:hover{background:#f9fafb}
  .btn-ghost.danger{color:var(--danger);border-color:#f0cccc} .btn-ghost.danger:hover{background:#fef2f2}
  .btn:disabled{opacity:.5;cursor:default}
  .btn-sm{padding:.3rem .75rem;font-size:.8rem;font-weight:500;margin-top:.45rem}
+ a.btn{display:block;text-decoration:none;text-align:center;margin-top:.6rem}
+ .okbox a.btn{color:#fff}  /* beat the .okbox link colour — button text stays white */
  label{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;
    color:var(--muted);font-weight:600;margin:.55rem 0 .22rem}
  #form>.row:first-child label{margin-top:0}
  input,textarea,select{width:100%;padding:.48rem .6rem;border:1px solid var(--field);border-radius:10px;
    font-size:.95rem;background:#fff;font-family:inherit;transition:border-color .15s,box-shadow .15s}
  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
- .row{display:flex;gap:.6rem} .row>div{flex:1} .narrow{flex:.55!important}
- .pv{display:flex;gap:.6rem;margin-top:.4rem} .pv input{flex:3} .pv select{flex:2;min-width:0}
+ .row{display:flex;gap:.6rem} .row>div{flex:1} .narrow{flex:.45!important}
+ .pv{display:flex;gap:.6rem;margin-top:.4rem} .pv input{flex:3} .pv select{flex:1.3;min-width:0}
  .create{width:100%;margin-top:.7rem;padding:.72rem;font-size:.98rem}
- .hint{font-size:.72rem;color:var(--muted);margin-top:.3rem;text-align:center;min-height:.9rem}
+ .hint{font-size:.72rem;color:var(--muted);text-align:center} .hint:not(:empty){margin-top:.3rem}
  .conf{display:none;margin-top:.8rem}
  .confpill{display:inline-block;font-weight:700;font-size:.8rem;padding:.25rem .7rem;
    border-radius:999px;color:#fff}
  .conf .note{margin-top:.35rem;color:var(--muted);font-size:.8rem}
- .okbox .how{margin-top:.45rem;font-size:.8rem;color:var(--muted)}
- #msg{margin-top:1rem;font-size:.92rem;color:var(--muted)} #msg a{color:var(--accent);font-weight:600}
+ .okbox .how{margin-top:.45rem;color:var(--muted)}
+ #msg{margin-top:1rem;font-size:.92rem;color:var(--muted)} #msg:empty{display:none}
+ #msg a{color:var(--accent);font-weight:600}
  .err{color:var(--danger)}
 </style></head><body>
 <div class="card">
-<h1>Contacts quick capture to Google</h1>
-<p class="sub">Take picture, drop screenshot, image, text, URL and parse. Save as Google Contact or vCard after review.</p>
+<h1>Contacts quick capture</h1>
 <div class="cols">
 <div class="col">
+<div class="colhead"><span class="step">1</span>Capture</div>
+<div class="colbody">
 <div id="drop" class="empty" contenteditable="true"></div>
 <div id="camwrap" style="display:none">
  <video id="cam" autoplay playsinline muted></video>
@@ -353,7 +362,10 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  <div id="confnote" class="note"></div></div>
 <div id="msg"></div>
 </div>
+</div>
 <div class="col">
+<div class="colhead"><span class="step">2</span>Edit &amp; create</div>
+<div class="colbody">
 <div id="form">
  <div class="row"><div class="narrow"><label>Prefix</label><input id="honorificPrefix"></div>
    <div><label>First name</label><input id="givenName"></div>
@@ -378,9 +390,12 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  </div>
 </div>
 </div>
-<div class="col success-col">
-<div class="lbl">Last saved contact</div>
+</div>
+<div class="col">
+<div class="colhead"><span class="step">3</span>View</div>
+<div class="colbody">
 <div id="success"><div class="ph">Your saved contact appears here after you create it in Google or download a vCard.</div></div>
+</div>
 </div>
 </div>
 </div>
@@ -497,14 +512,17 @@ function successBox(title,...nodes){
 document.getElementById('create').onclick=async()=>{
   document.getElementById('create').disabled=true;   // no double-create
   msg.textContent='Creating… (first run opens a Google login window in your browser)';
+  const c=collectContact();
   let d;
   try{const r=await fetch('/create',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(collectContact())}); d=await r.json();}
+    body:JSON.stringify(c)}); d=await r.json();}
   catch(e){showErr('Request failed: '+e.message);refreshCreate();return;}
   if(d.error){showErr(d.error);refreshCreate();return;}
+  const nm=document.createElement('div');nm.className='name';
+  nm.textContent=[c.givenName,c.familyName].filter(Boolean).join(' ')||c.company||'';
   const a=document.createElement('a');a.href=d.link;a.target='_blank';
-  a.textContent='Open in Google Contacts →';
-  successBox('✓ Contact created',a);
+  a.className='btn btn-primary';a.textContent='Open Google contact';
+  successBox('✓ Contact created',nm,a);
   gstate.textContent='';   // a create succeeded, so auth is done
   resetForm(); msg.textContent='';
 };
