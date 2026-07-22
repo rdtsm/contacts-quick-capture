@@ -54,7 +54,7 @@ PROMPT = """Extract contact information from the input. Respond with ONLY a JSON
 no markdown fences, using exactly these keys (use "" or [] when unknown):
 {"honorificPrefix":"","givenName":"","familyName":"","company":"","jobTitle":"",
 "phones":[{"value":"","type":"mobile"}],"emails":[{"value":"","type":"work"}],
-"street":"","city":"","region":"","postalCode":"","country":"",
+"street":"","city":"","region":"","postalCode":"","country":"","countryCode":"",
 "website":"","socials":[{"value":"","type":"profile"}],"notes":"",
 "confidence":100,"parseComment":""}
 
@@ -71,6 +71,10 @@ Rules:
 - socials: LinkedIn / X (Twitter) / Instagram / Facebook / GitHub etc. Output the full
   profile URL — build it from an @handle when the platform is clear (linkedin.com/in/...,
   x.com/handle, github.com/handle). "type" is always "profile".
+- country / countryCode: keep them in sync. "country" is the full name (e.g. China),
+  "countryCode" its ISO 3166-1 alpha-2 code (e.g. CN, DE, US). Infer both from the
+  address, phone country code, or language when only one is present. If you set one,
+  set the other; leave both "" only when there is no country signal at all.
 - website: the company or personal homepage, NOT a social profile.
 - honorificPrefix: a name title such as Dr., Prof., Mr., Ms., Datuk. Put it ONLY here,
   never in givenName or notes.
@@ -213,7 +217,8 @@ def create():
                               "city": c.get("city", ""),
                               "region": c.get("region", ""),
                               "postalCode": c.get("postalCode", ""),
-                              "country": c.get("country", "")}]
+                              "country": c.get("country", ""),
+                              "countryCode": c.get("countryCode", "")}]
     urls = []
     if c.get("website"):
         urls.append({"value": c["website"], "type": "homePage"})
