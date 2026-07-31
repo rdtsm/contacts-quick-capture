@@ -161,6 +161,14 @@ ever. (A personal Gmail account also works but needs extra steps — see
 ./.venv/bin/python app.py
 ```
 
+Or detached, so the server survives closing the terminal:
+
+```bash
+nohup ./.venv/bin/python app.py > app.log 2>&1 &
+```
+
+Stop it anytime with `kill $(lsof -ti tcp:8321)`.
+
 Open **http://localhost:8321** and pin the browser tab. On your **first** "Create
 Google Contact", a browser window asks you to authorize — approve once (no warning,
 because it's an Internal app). The authorization is cached in `token.json` and every
