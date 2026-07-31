@@ -3,6 +3,9 @@ credentials.json
 token.json
 .env
 
+# server log (written by the LaunchAgent)
+app.log
+
 # python
 .venv/
 __pycache__/

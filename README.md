@@ -157,17 +157,45 @@ ever. (A personal Gmail account also works but needs extra steps — see
 
 ### 4. Run it
 
-```bash
-./.venv/bin/python app.py
-```
-
-Or detached, so the server survives closing the terminal:
+Install the LaunchAgent once — the server then starts at every login and restarts
+automatically if it ever dies, so `localhost:8321` is always live:
 
 ```bash
-nohup ./.venv/bin/python app.py > app.log 2>&1 &
+APP="$HOME/Developer/contacts-quick-capture"   # adjust if you cloned elsewhere
+cat > ~/Library/LaunchAgents/com.rdtsm.contacts-quick-capture.plist <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.rdtsm.contacts-quick-capture</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$APP/.venv/bin/python</string>
+    <string>$APP/app.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>$APP</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$APP/app.log</string>
+  <key>StandardErrorPath</key><string>$APP/app.log</string>
+</dict>
+</plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.rdtsm.contacts-quick-capture.plist
 ```
 
-Stop it anytime with `kill $(lsof -ti tcp:8321)`.
+The `PATH` entry matters: launchd doesn't load your shell profile, and the server
+needs to find the `claude` CLI (covered above for the standard installer, Homebrew
+and npm locations — extend it if yours lives elsewhere).
+
+Stop it with `launchctl bootout gui/$(id -u)/com.rdtsm.contacts-quick-capture`
+(it returns at next login; delete the plist file too to remove it for good).
+To run once without the agent: `./.venv/bin/python app.py`.
 
 Open **http://localhost:8321** and pin the browser tab. On your **first** "Create
 Google Contact", a browser window asks you to authorize — approve once (no warning,
@@ -196,7 +224,8 @@ Per contact (~15 s):
 |---|---|
 | Browser/tab closed | Nothing lost — reopen `localhost:8321` |
 | Mac sleep/wake | Server keeps running |
-| Mac restart / logout | Server stops — rerun `python app.py` (see [Roadmap](#roadmap) for auto-start) |
+| Mac restart / logout | Nothing lost — the LaunchAgent restarts the server at login |
+| Server crash | The LaunchAgent restarts it within seconds |
 | Google token | Auto-refreshes; persists indefinitely for an Internal Workspace app |
 
 ---
@@ -204,8 +233,8 @@ Per contact (~15 s):
 ## Maintenance
 
 - **Update to the latest version:** `git pull`, then restart the server.
-- **Restart the server:** rerun `./.venv/bin/python app.py`. The dev server stops on
-  logout/restart; re-running is the only step.
+- **Restart the server** (e.g. after `git pull`):
+  `launchctl kickstart -k gui/$(id -u)/com.rdtsm.contacts-quick-capture`
 - **After changing `app.py`, run the regression tests:** `./.venv/bin/pip install pytest`
   (once), then `./.venv/bin/python -m pytest -q`. They check the field wiring between
   the form and the server, and the mapping to Google's contact format.
@@ -268,14 +297,12 @@ as above. No code change is needed.
 
 ## Roadmap
 
-- **Auto-start at login** — a macOS LaunchAgent so `localhost:8321` is always live and
-  you never restart the server manually.
 - **Mobile capture (Android/iPhone)** — use the phone as a client of the Mac server.
   *Sketch:* reach the Mac over a private [Tailscale](https://tailscale.com) tunnel
   (`tailscale serve` provides the HTTPS the mobile camera requires; nothing is exposed
   to the internet, so the privacy posture holds), and add a "Choose photo" file input —
   on Android that button natively offers camera-or-gallery. Requires the Mac to be
-  awake and serving, which makes the LaunchAgent above the natural companion.
+  awake; the LaunchAgent (see [Run it](#4-run-it)) keeps it serving.
 - **Duplicate hints** *(under consideration — not decided)* — after parsing, mark any
   field that already exists in your Google Contacts with a subtle dot, so you spot a
   duplicate before creating one. Advisory only: Create stays enabled.
