@@ -1,7 +1,25 @@
 """Regression tests — run:  ./.venv/bin/python -m pytest -q  (pip install pytest once)."""
+import json
 import re
 
+import pytest
+
 import app
+
+
+def test_strip_json_survives_fences_and_trailing_prose():
+    # Trigger: a hard input (a card photographed on its blank side) makes the model
+    # wrap the JSON in a fence and append a sentence explaining what it couldn't
+    # find — which used to fail the whole parse with "Extra data: line 4 column 1".
+    body = json.dumps({"givenName": "Mei", "confidence": 40})
+    assert app._strip_json(body)["givenName"] == "Mei"
+    assert app._strip_json(f"```json\n{body}\n```")["givenName"] == "Mei"
+    assert app._strip_json(f"Here is the contact:\n\n{body}")["givenName"] == "Mei"
+    assert app._strip_json(
+        f"```json\n{body}\n```\n\nNote: no name is visible on this side of the card."
+    )["confidence"] == 40
+    with pytest.raises(ValueError):
+        app._strip_json("I could not find any contact details in this image.")
 
 
 def test_every_simple_field_has_a_dom_input():

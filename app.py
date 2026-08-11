@@ -97,8 +97,12 @@ Rules:
 
 
 def _strip_json(text):
-    text = re.sub(r"^```(json)?|```$", "", text.strip(), flags=re.M).strip()
-    return json.loads(text)
+    # Decode the first JSON object and ignore whatever surrounds it: the model
+    # sometimes adds a markdown fence or a sentence explaining what it couldn't read.
+    i = text.find("{")
+    if i < 0:
+        raise ValueError("model returned no JSON object")
+    return json.JSONDecoder().raw_decode(text, i)[0]
 
 
 def _parse_via_api(content_blocks):
@@ -122,6 +126,7 @@ def _parse_via_cli(content_blocks):
     file on disk."""
     import shutil
     import subprocess
+    import sys
     import tempfile
 
     prompt = "\n\n".join(b["text"] for b in content_blocks if b["type"] == "text")
@@ -138,7 +143,11 @@ def _parse_via_cli(content_blocks):
                            capture_output=True, text=True, timeout=180, cwd=workdir)
         if r.returncode != 0:
             raise RuntimeError(r.stderr.strip() or "claude CLI failed")
-        return _strip_json(r.stdout)
+        try:
+            return _strip_json(r.stdout)
+        except Exception:
+            print(f"unparseable model output:\n{r.stdout[:2000]}", file=sys.stderr)
+            raise
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 
