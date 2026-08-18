@@ -320,7 +320,7 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  #drop:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
  #drop.empty:before{content:"Paste or drop any contact information — text, screenshot, image, URL, or take direct photo";color:#9ca3af}
  img.thumb{width:100%;max-height:190px;object-fit:contain;display:block;margin-top:.6rem;border-radius:8px}
- #cam{width:100%;max-height:300px;border-radius:12px;background:#000;margin-top:.6rem}
+ #cam{width:100%;max-height:300px;border-radius:12px;background:#000;margin-top:.6rem;transform:scaleX(-1)}
  .btnrow{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.9rem}
  .btn{font:inherit;font-weight:600;font-size:.92rem;padding:.55rem 1.1rem;border-radius:10px;
    border:1px solid transparent;cursor:pointer;transition:background .15s,border-color .15s,color .15s}

@@ -71,6 +71,14 @@ sentence — which the model adds on hard inputs — failed the whole parse with
 *Rejected:* tightening the prompt — it already forbade fences and prose, and the model
 overrode it; parser tolerance is the fix that holds.
 
+**Mirror the camera preview** (2026-08-18). `#cam` gets `transform:scaleX(-1)`. The Mac's
+camera faces the user, so the raw feed moved the card left when you moved it right, and
+reversed tilt; vertical was never affected. *Cost:* card text reads backwards while aiming.
+*Not done:* mirroring the captured frame — that would reverse the text and break parsing.
+`drawImage` reads decoded video frames, so the CSS transform never touches the saved JPEG.
+*Deferred:* mirroring only a user-facing camera (`getSettings().facingMode`) — needed when
+backlog item 1 puts a phone's rear camera in the loop.
+
 **Dropped: "Open vCard" button** (2026-07-22). Browsers cannot hand a downloaded file to a
 local app. The only working version runs `open` on the server — macOS-only machinery for
 a button that saves one double-click.
