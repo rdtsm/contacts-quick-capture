@@ -3,6 +3,99 @@
 Long-term memory for future sessions. User-facing setup, usage and the high-level
 backlog live in [README.md](README.md) — this file records *why*, not *how to run*.
 
+## Requirements, and how the alternatives score
+
+What this tool has to do, in the order that matters. R1 to R4 are why it exists at all;
+a product that misses one of them cannot be adopted, however good the rest is.
+
+| | Requirement | Why |
+|---|---|---|
+| **R1** | **Any input, not just cards.** Photo, live camera, pasted text, email signature, screenshot, URL | The card is the rarest of the five in practice. A signature block or a screenshot is the everyday case |
+| **R2** | **Correct Google labels on write.** Mobile / Work / Work fax, name prefix, Home page, Profile, ISO country code | A contact that lands as one unlabelled blob still has to be edited by hand, which is the work being removed |
+| **R3** | **No vendor account, no second contact database.** Nothing accumulates off the machine | The address book already exists. A tool that owns a copy of it is a dependency with an exit cost |
+| **R4** | **Untrusted input is contained.** A card or a fetched page cannot make the parser reach anything else on disk | The input is a photograph handed over by a stranger, and the same machine holds the Google credentials |
+| **R5** | **Zero marginal cost per contact** | A few contacts a week does not carry a per-seat subscription |
+| **R6** | **The model flags what it could not read**, and a human confirms before the write | Attention goes to the one uncertain field instead of all twelve |
+
+R6 is not gradeable below: no vendor documents whether or how uncertainty is surfaced.
+Prices are per seat, checked 2026-09-05.
+
+### Freemium and paid
+
+| Product | Model | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|
+| [CamCard](https://www.camcard.com/) | Free + team tiers ([no published price](https://zapier.com/blog/best-business-card-scanner-software/)) | ✗ | ✓ | ✗ | ✗ | ~ |
+| [Covve Scan](https://covve.com/pricing/) | $12/mo, $119/yr | ✗ | ~ | ✗ | ✗ | ✗ |
+| [ABBYY FineReader](https://zapier.com/blog/best-business-card-scanner-software/) | ~$99/yr | ~ | ✗ | ~ | ✗ | ✗ |
+| Blinq, Popl, HiHello, [Haystack](https://spreadly.app/en/blog/top-7-best-business-card-scanner-apps-2026) | Freemium, per seat | ✗ | ~ | ✗ | ✗ | ~ |
+| HubSpot, Salesflare | Bundled with the CRM | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [iOS Live Text](https://www.idownloadblog.com/2023/06/07/how-to-scan-business-card-details-iphone-contacts/), [Google Lens](https://phototranslator.net/blog/google-lens-honest-review-2026) | Free, built in | ~ | ✗ | ✓ | ✓ | ✓ |
+| [Parsio](https://parsio.io/email-signature-parser/), [SigParser](https://www.sigparser.com/), ContactsFlow | Freemium to enterprise SaaS | ✗ | ~ | ✗ | ✗ | ✗ |
+
+**CamCard is the closest**, and it does sync to Google Contacts — but the card goes to its
+cloud and the contact lives in its account first, because the product is team lead capture
+and a personal address book is the side effect. **The real incumbent is iOS Live Text**: free,
+offline, already on the phone, and it passes R3 to R5 outright. It fails R2 completely, and
+that failure is behavioural rather than technical. It hands over one field at a time —
+long-press the number, add to contacts, repeat for name, email, company — which is slow
+enough that the contact often never gets filed at all. Everything paid in this table fails
+R3 by construction: the subscription exists because the vendor holds the database. Cloud OCR
+is the category norm, and [reselling scanned contacts has been documented in
+it](https://www.folocard.com/2019/08/07/business-card-scanner-privacy-gdpr-ccpa/).
+
+### Open source
+
+Searched GitHub 2026-09-05. Nothing packaged does this job; the field splits three ways,
+and each way misses a different requirement.
+
+| Project | What it is | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|
+| [Card OCR demos](https://github.com/topics/business-card-recognition) — [dhruv2601](https://github.com/dhruv2601/Business-Card-Scanner), [stpabhi](https://github.com/stpabhi/business-card-scanner), [ierolsen](https://github.com/ierolsen/Business-Card-Reader-App), [Bob-GGB](https://github.com/Bob-GGB/BusinessCardScannerVer3) | Tesseract or Vision plus regex; one spaCy NER model | ✗ | ✗ | ✓ | ✓ | ✓ |
+| [Monica](https://github.com/monicahq/monica) (25.2k), [Twenty](https://github.com/twentyhq/twenty) (56.3k), [harperreed/crm](https://github.com/harperreed/crm) | Self-hosted personal CRM; harperreed's syncs Google contacts and ships an MCP server | ✗ | ✗ | ✗ | ✓ | ✓ |
+| [n8n](https://github.com/n8n-io/n8n) (203k) | Fair-code automation platform: wire a vision node to the Google Contacts node | ✓ | ~ | ~ | ✗ | ✗ |
+
+**The card OCR projects are demos.** Double-digit stars at best, and the three most complete
+were last touched in 2017, 2022 and 2022; only [Bob-GGB](https://github.com/Bob-GGB/BusinessCardScannerVer3)
+(Swift, 3 stars) is still moving. They return name, phone and email as text: no label mapping
+and no write path, so the contact is still assembled by hand. One of the better-looking ones,
+[krayc425](https://github.com/krayc425/BusinessCardScanner), is a client for the ABBYY and
+CamCard commercial APIs — open source wrapping the paid service, not replacing it. What the
+cluster does get free is R4: regex has no model to inject into. That is the trade in one line,
+because regex also cannot read a card the way a model can.
+
+**The personal CRMs fail R3 on purpose.** Monica and Twenty are excellent and enormous, and a
+second contact database is their entire product — the thing this tool refuses to become. None
+ingests a card photo. [harperreed/crm](https://github.com/harperreed/crm) is the nearest
+neighbour in spirit (Go, Google sync, MCP server, active) and still starts from contacts that
+already exist.
+
+**n8n is the only real open-source path to the same outcome**, and it is a fair comparison:
+self-hosted, a vision node into the Google Contacts node, done. What it costs is the platform
+to run and a workflow to maintain, a metered API key instead of a subscription CLI, no review
+screen unless you build one, and no containment — an n8n workflow runs with whatever
+credentials the node holds, which is the R4 failure this app was designed around.
+
+A fourth group is large and irrelevant: dozens of "digital business card" and vCard-generator
+repos solve the inverse problem, sharing your own card rather than filing someone else's.
+
+### Where this app lands
+
+R1 to R6, by construction. The two that nothing else in the table holds together are **R1 with
+R2** — an arbitrary scrap in, a correctly-labelled contact out — and **R4**: the parse runs in a
+throwaway temp directory holding only the image, the prompt goes in over stdin, and POSTs are
+same-origin only. Image-based prompt injection is a [documented 2026 attack
+class](https://labs.cloudsecurityalliance.org/research/csa-research-note-image-prompt-injection-multimodal-llm-2026/)
+and [OWASP's answer is sandboxing, not filtering](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html).
+Nothing above states a threat model at all.
+
+**Where they win, and it is not close.** Conference batch capture, CRM push and team sharing
+are what CamCard and Covve are for; CJK OCR is theirs. Here there is no mobile app (backlog 1),
+no duplicate detection (backlog 2), and setup is a 15-minute OAuth registration against their
+install-and-go. One person, a few contacts a week, is the only frame in which this comparison
+flatters the app.
+
+Legend: ✓ meets it · ~ partly · ✗ does not.
+
 ## Architecture and why
 
 Single file, `app.py` (~580 lines): Flask server, embedded HTML/CSS/JS, all routes.
@@ -118,8 +211,6 @@ a button that saves one double-click.
   `.venv` once.
 - **The pre-commit hook blocks any staged image in this public repo.** Expect it when the
   screenshot changes, and get explicit confirmation before `--no-verify`.
-- **Stale name:** `app.py`'s module docstring still says "Contact Dropper", the pre-rename
-  product name. Cosmetic, untouched to keep diffs surgical.
 
 ## Backlog
 

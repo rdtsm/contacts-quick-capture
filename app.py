@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contact Dropper — drop text / image / URL, parse with Claude, create a Google Contact.
+"""Contacts quick capture — drop text / image / URL, parse with Claude, create a Google Contact.
 
 Run:  python app.py   then open http://localhost:8321
 Parses via the Claude Code CLI (your Claude subscription) by default — no API key needed.
@@ -613,5 +613,5 @@ if __name__ == "__main__":
     mode = ("metered API (ANTHROPIC_API_KEY)" if ANTHROPIC_API_KEY
             else f"Claude Code CLI / subscription — model {CLI_MODEL}")
     print(f"Parsing via: {mode}")
-    print(f"Contact Dropper → http://localhost:{PORT}")
+    print(f"Contacts quick capture → http://localhost:{PORT}")
     app.run(port=PORT, debug=False)
