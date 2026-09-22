@@ -98,7 +98,7 @@ Legend: ✓ meets it · ~ partly · ✗ does not.
 
 ## Architecture and why
 
-Single file, `app.py` (~580 lines): Flask server, embedded HTML/CSS/JS, all routes.
+Single file, `app.py`: Flask server, embedded HTML/CSS/JS, all routes.
 Nothing is split out because nothing is reused — one file is readable end to end and
 has no import graph to keep in your head.
 
@@ -171,6 +171,16 @@ reversed tilt; vertical was never affected. *Cost:* card text reads backwards wh
 `drawImage` reads decoded video frames, so the CSS transform never touches the saved JPEG.
 *Deferred:* mirroring only a user-facing camera (`getSettings().facingMode`) — needed when
 backlog item 1 puts a phone's rear camera in the loop.
+
+**Two-layer error messages** (2026-09-22, `dfe1689`). An Anthropic outage reached the
+page as "claude CLI failed": the CLI prints API errors on stdout and exits 1 with an
+empty stderr, and the app relayed only stderr. Parse and Google failures now return a
+plain message with one fixed next step (try again, check status.claude.com; or delete
+`token.json` and authorise again) plus a `detail` field holding the raw service text,
+shown under a closed "Technical details" element labelled as unedited and possibly
+cryptic. Guidance is fixed per endpoint, never derived from the raw text. *Rejected:*
+inspecting vendor error strings to choose advice — the logic grows without bound and is
+wrong on the first message it has not seen.
 
 **Dropped: "Open vCard" button** (2026-07-22). Browsers cannot hand a downloaded file to a
 local app. The only working version runs `open` on the server — macOS-only machinery for

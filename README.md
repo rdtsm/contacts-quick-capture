@@ -235,9 +235,10 @@ Per contact (~15 s):
 - **Update to the latest version:** `git pull`, then restart the server.
 - **Restart the server** (e.g. after `git pull`):
   `launchctl kickstart -k gui/$(id -u)/com.rdtsm.contacts-quick-capture`
-- **If something fails, check the log:** `tail -f app.log` — the LaunchAgent writes
-  the server's output there, including the model's raw reply whenever a parse can't
-  be read as contact data.
+- **If something fails:** the page shows a plain message with what to do next and,
+  under *Technical details*, the raw reply from Anthropic or Google. Anything deeper
+  (e.g. the model's raw output when a parse can't be read as contact data) is in
+  `tail -f app.log`, where the LaunchAgent writes the server's output.
 - **After changing `app.py`, run the regression tests:** `./.venv/bin/pip install pytest`
   (once), then `./.venv/bin/python -m pytest -q`. They check the field wiring between
   the form and the server, and the mapping to Google's contact format.
