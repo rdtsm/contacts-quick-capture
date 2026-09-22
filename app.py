@@ -142,7 +142,8 @@ def _parse_via_cli(content_blocks):
         r = subprocess.run(["claude", "-p", "--model", CLI_MODEL], input=prompt,
                            capture_output=True, text=True, timeout=180, cwd=workdir)
         if r.returncode != 0:
-            raise RuntimeError(r.stderr.strip() or "claude CLI failed")
+            # The CLI prints API errors on stdout, so surface both streams.
+            raise RuntimeError((r.stderr.strip() or r.stdout.strip())[:500] or "claude CLI failed")
         try:
             return _strip_json(r.stdout)
         except Exception:
@@ -219,7 +220,9 @@ def parse():
         data["parseComment"] = str(data.get("parseComment") or "")
         return jsonify(data)
     except Exception as e:
-        return jsonify(error=f"Parsing failed: {e}"), 500
+        return jsonify(error="The AI could not read this. Try again in a moment. "
+                             "If it keeps failing, check status.claude.com.",
+                       detail=str(e)), 500
 
 
 def contact_body(c):
@@ -259,6 +262,10 @@ def contact_body(c):
     return body
 
 
+GOOGLE_FAIL=("The contact could not be saved to Google. Try again. "
+             "If it keeps failing, delete token.json and authorise once more.")
+
+
 @app.post("/create")
 def create():
     body = contact_body(request.get_json(force=True))
@@ -268,11 +275,11 @@ def create():
         r = google_session().post(
             "https://people.googleapis.com/v1/people:createContact", json=body)
         if r.status_code != 200:
-            return jsonify(error=f"Google Contacts error: {r.status_code} — {r.text[:300]}"), 500
+            return jsonify(error=GOOGLE_FAIL, detail=f"{r.status_code} — {r.text[:300]}"), 500
         rid = r.json()["resourceName"].split("/")[-1]
         return jsonify(ok=True, link=f"https://contacts.google.com/person/{rid}")
     except Exception as e:
-        return jsonify(error=f"Google Contacts error: {e}"), 500
+        return jsonify(error=GOOGLE_FAIL, detail=str(e)), 500
 
 
 @app.get("/")
@@ -348,6 +355,9 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
  #msg{margin-top:1rem;font-size:.92rem;color:var(--muted)} #msg:empty{display:none}
  #msg a{color:var(--accent);font-weight:600}
  .err{color:var(--danger)}
+ .err details{margin-top:6px;font-size:.85em;color:var(--muted,#666)}
+ .err summary{cursor:pointer}
+ .err pre{white-space:pre-wrap;word-break:break-word;margin:4px 0 0}
 </style></head><body>
 <div class="card">
 <h1>Contacts quick capture</h1>
@@ -411,8 +421,13 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
 <script>
 const drop=document.getElementById('drop'),msg=document.getElementById('msg');
 let imageBlob=null;
-function showErr(t){msg.textContent='';const s=document.createElement('span');
-  s.className='err';s.textContent=t;msg.appendChild(s);}
+function showErr(t,detail){msg.textContent='';const s=document.createElement('span');
+  s.className='err';s.textContent=t;
+  if(detail){const d=document.createElement('details');
+    d.innerHTML='<summary>Technical details</summary>'+
+      '<div>Raw message from the service, shown unedited. It may be cryptic.</div><pre></pre>';
+    d.querySelector('pre').textContent=detail;s.appendChild(d);}
+  msg.appendChild(s);}
 // parse-confidence widget: pill green>=80 / amber>=50 / red below, plus comment
 const confEl=document.getElementById('conf'),confPill=document.getElementById('confpill'),
   confNote=document.getElementById('confnote');
@@ -493,7 +508,7 @@ document.getElementById('parse').onclick=async()=>{
   try{const r=await fetch('/parse',{method:'POST',body:fd}); d=await r.json();}
   catch(e){showErr('Request failed: '+e.message);return;}
   finally{btn.disabled=false;}
-  if(d.error){showErr(d.error);return;}
+  if(d.error){showErr(d.error,d.detail);return;}
   for(const f of SIMPLE)document.getElementById(f).value=d[f]||'';
   fillRows('phones',d.phones); fillRows('emails',d.emails);
   document.getElementById('socials').value=(d.socials||[]).map(s=>s.value||s).join(', ');
@@ -526,7 +541,7 @@ document.getElementById('create').onclick=async()=>{
   try{const r=await fetch('/create',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(c)}); d=await r.json();}
   catch(e){showErr('Request failed: '+e.message);refreshCreate();return;}
-  if(d.error){showErr(d.error);refreshCreate();return;}
+  if(d.error){showErr(d.error,d.detail);refreshCreate();return;}
   const nm=document.createElement('div');nm.className='name';
   nm.textContent=[c.givenName,c.familyName].filter(Boolean).join(' ')||c.company||'';
   const a=document.createElement('a');a.href=d.link;a.target='_blank';
