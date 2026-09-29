@@ -59,3 +59,29 @@ def test_contact_body_maps_all_fields():
 
 def test_contact_body_empty_input_gives_empty_body():
     assert app.contact_body({}) == {}
+
+
+def _png(tag):
+    # Minimal bytes with a PNG mimetype — the stubbed parser never decodes them.
+    import io
+    return (io.BytesIO(b"\x89PNG" + tag.encode()), f"{tag}.png", "image/png")
+
+
+def test_parse_sends_every_page_in_order(monkeypatch):
+    # Trigger: a two-sided card — the second photo used to replace the first,
+    # so the back side (often the other-language name) never reached Claude.
+    seen = []
+    monkeypatch.setattr(app, "claude_parse", lambda blocks: seen.extend(blocks) or {})
+    r = app.app.test_client().post("/parse", data={
+        "text": "", "image": [_png("front"), _png("back")]})
+    assert r.status_code == 200
+    imgs = [b for b in seen if b["type"] == "image"]
+    assert [app.base64.b64decode(b["source"]["data"])[4:] for b in imgs] == [b"front", b"back"]
+
+
+def test_parse_rejects_more_than_max_pages(monkeypatch):
+    monkeypatch.setattr(app, "claude_parse", lambda blocks: {})
+    r = app.app.test_client().post("/parse", data={
+        "image": [_png(f"p{i}") for i in range(app.MAX_PAGES + 1)]})
+    assert r.status_code == 400
+    assert "pages" in r.get_json()["error"]

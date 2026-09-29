@@ -21,10 +21,11 @@ CLI_MODEL = "sonnet"                         # CLI path: fast, strong, free on y
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 SCOPES = ["https://www.googleapis.com/auth/contacts"]
 PORT = 8321
+MAX_PAGES = 4                                # photos per card (front, back, fold-outs)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # bound uploaded image size
+app.config["MAX_CONTENT_LENGTH"] = 40 * 1024 * 1024  # bound total upload (all pages)
 
 # ---------------------------------------------------------------- google auth
 def google_session():
@@ -87,13 +88,18 @@ Rules:
   visible field extracted unambiguously. 70-89: minor uncertainty (one guessed
   label, partial address, low-res but readable). 40-69: notable gaps or guesses.
   Below 40: badly degraded input (blurry, truncated, conflicting).
+- Several images: they are the sides or pages of ONE card. Merge them into one
+  contact without duplicating fields. If they clearly show different people, parse
+  the first and say so in parseComment.
 - parseComment: one short sentence on anything the user should check. ALWAYS
   name the specific field and the cause when an item could not be fully
   identified, e.g. "familyName incomplete - a finger covers part of the card",
   "postalCode unreadable - left empty", "second phone labelled work by guess -
   card gives no cue". Empty string when everything parsed cleanly.
 - notes: only information from the input itself. NEVER put parsing-quality
-  remarks in notes - they belong in parseComment."""
+  remarks in notes - they belong in parseComment. Put card details that fit no
+  field here: further addresses, the name in another script, extra websites,
+  tagline or services, branch offices."""
 
 
 def _strip_json(text):
@@ -132,12 +138,13 @@ def _parse_via_cli(content_blocks):
     prompt = "\n\n".join(b["text"] for b in content_blocks if b["type"] == "text")
     workdir = tempfile.mkdtemp(prefix="contact-capture-")
     try:
-        for b in content_blocks:
-            if b["type"] == "image":
-                img = os.path.join(workdir, "card.png")
-                with open(img, "wb") as f:
-                    f.write(base64.b64decode(b["source"]["data"]))
-                prompt += f"\n\nAn image is saved at {img} — read it and extract from it too."
+        imgs = [b for b in content_blocks if b["type"] == "image"]
+        for n, b in enumerate(imgs, 1):
+            ext = b["source"]["media_type"].split("/")[-1]  # jpeg/png/gif/webp — the Read tool keys on it
+            img = os.path.join(workdir, f"page-{n}.{ext}")
+            with open(img, "wb") as f:
+                f.write(base64.b64decode(b["source"]["data"]))
+            prompt += f"\n\nPage {n} of {len(imgs)} is saved at {img} — read it and extract from it too."
         # Prompt via stdin so variadic flags can't swallow it.
         r = subprocess.run(["claude", "-p", "--model", CLI_MODEL], input=prompt,
                            capture_output=True, text=True, timeout=180, cwd=workdir)
@@ -185,19 +192,21 @@ def _same_origin_only():
 @app.errorhandler(413)
 def _too_large(e):
     # JSON instead of Werkzeug's HTML page, so the UI shows a clear message
-    return jsonify(error="Image too large — the limit is 20 MB."), 413
+    return jsonify(error="Images too large — the limit is 40 MB in total."), 413
 
 
 @app.post("/parse")
 def parse():
     blocks = [{"type": "text", "text": PROMPT}]
-    img = request.files.get("image")
+    imgs = request.files.getlist("image")
     text = (request.form.get("text") or "").strip()
-    if img and (img.mimetype or "") not in ("image/jpeg", "image/png",
-                                            "image/gif", "image/webp"):
-        return jsonify(error=f"Unsupported image type ({img.mimetype}) — "
-                             "use JPEG, PNG, GIF or WebP."), 400
-    if img:
+    if len(imgs) > MAX_PAGES:
+        return jsonify(error=f"Too many pages — the limit is {MAX_PAGES} photos per card."), 400
+    for img in imgs:
+        if (img.mimetype or "") not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
+            return jsonify(error=f"Unsupported image type ({img.mimetype}) — "
+                                 "use JPEG, PNG, GIF or WebP."), 400
+    for img in imgs:
         blocks.append({"type": "image", "source": {
             "type": "base64",
             "media_type": img.mimetype or "image/png",
@@ -290,7 +299,7 @@ def index():
         state = "needs-auth"      # first create will open the Google sign-in
     else:
         state = "needs-setup"     # no OAuth client — Google path unavailable
-    return HTML.replace("__GOOGLE_STATE__", state)
+    return HTML.replace("__GOOGLE_STATE__", state).replace("__MAX_PAGES__", str(MAX_PAGES))
 
 # ---------------------------------------------------------------- UI
 HTML = """<!doctype html><html><head><meta charset="utf-8">
@@ -326,7 +335,15 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
    white-space:pre-wrap;overflow:auto;max-height:280px;background:#fcfcfd;transition:border-color .15s,box-shadow .15s}
  #drop:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.13)}
  #drop.empty:before{content:"Paste or drop any contact information — text, screenshot, image, URL, or take direct photo";color:#9ca3af}
- img.thumb{width:100%;max-height:190px;object-fit:contain;display:block;margin-top:.6rem;border-radius:8px}
+ #pages{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.6rem} #pages:empty{display:none}
+ .page{position:relative} .page:only-child{grid-column:1/-1}
+ .page img{width:100%;height:110px;object-fit:contain;display:block;border-radius:8px;background:#f3f4f6}
+ .page:only-child img{height:170px}
+ .page .pn{position:absolute;left:6px;bottom:6px;font-size:.7rem;color:#fff;background:rgba(0,0,0,.55);
+   border-radius:6px;padding:0 .35rem}
+ .page .rm{position:absolute;top:5px;right:5px;width:1.6rem;height:1.6rem;border-radius:50%;border:none;
+   background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:1rem;line-height:1}
+ .page .rm:hover{background:var(--danger)}
  #cam{width:100%;max-height:300px;border-radius:12px;background:#000;margin-top:.6rem;transform:scaleX(-1)}
  .btnrow{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.9rem}
  .btn{font:inherit;font-weight:600;font-size:.92rem;padding:.55rem 1.1rem;border-radius:10px;
@@ -366,6 +383,7 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
 <div class="colhead"><span class="step">1</span>Capture</div>
 <div class="colbody">
 <div id="drop" class="empty" contenteditable="true"></div>
+<div id="pages"></div>
 <div id="camwrap" style="display:none">
  <video id="cam" autoplay playsinline muted></video>
  <div class="btnrow"><button id="snap" class="btn btn-primary">Capture</button>
@@ -420,7 +438,8 @@ HTML = """<!doctype html><html><head><meta charset="utf-8">
 </div>
 <script>
 const drop=document.getElementById('drop'),msg=document.getElementById('msg');
-let imageBlob=null;
+const MAX_PAGES=__MAX_PAGES__;
+let pages=[];   // one entry per card side/page: {blob,url}
 function showErr(t,detail){msg.textContent='';const s=document.createElement('span');
   s.className='err';s.textContent=t;
   if(detail){const d=document.createElement('details');
@@ -467,18 +486,25 @@ function fillRows(kind,arr){const c=document.getElementById(kind);c.innerHTML=''
 function collectRows(kind){return [...document.getElementById(kind).querySelectorAll('.row')]
   .map(r=>({value:r.querySelector('input').value.trim(),type:r.querySelector('select').value}))
   .filter(x=>x.value);}
-drop.addEventListener('input',()=>{
-  if(imageBlob&&!drop.querySelector('img.thumb'))imageBlob=null; // thumbnail deleted by hand
-  drop.classList.toggle('empty',!drop.textContent.trim()&&!imageBlob);});
-function addImage(blob){imageBlob=blob;   // one image per capture — a new one replaces it
-  const old=drop.querySelector('img.thumb');if(old){URL.revokeObjectURL(old.src);old.remove();}
-  const i=document.createElement('img');i.className='thumb';
-  i.src=URL.createObjectURL(blob);drop.appendChild(i);drop.classList.remove('empty');}
+function syncEmpty(){drop.classList.toggle('empty',!drop.textContent.trim());}
+drop.addEventListener('input',syncEmpty);
+// pages: each photo/paste/drop adds one; every thumbnail has its own remove button
+function renderPages(){const box=document.getElementById('pages');box.innerHTML='';
+  pages.forEach((p,n)=>{const d=document.createElement('div');d.className='page';
+    const i=document.createElement('img');i.src=p.url;
+    const pn=document.createElement('span');pn.className='pn';pn.textContent='Page '+(n+1);
+    const rm=document.createElement('button');rm.className='rm';rm.textContent='×';
+    rm.title='Remove this page';
+    rm.onclick=()=>{URL.revokeObjectURL(p.url);pages.splice(n,1);renderPages();};
+    d.append(i,pn,rm);box.appendChild(d);});}
+function addImage(blob){
+  if(pages.length>=MAX_PAGES){showErr('Up to '+MAX_PAGES+' pages per card — remove one first.');return;}
+  pages.push({blob,url:URL.createObjectURL(blob)});renderPages();}
 drop.addEventListener('paste',e=>{for(const it of e.clipboardData.items)
   if(it.type.startsWith('image/')){e.preventDefault();addImage(it.getAsFile());}});
 drop.addEventListener('drop',e=>{e.preventDefault();
   for(const f of e.dataTransfer.files) if(f.type.startsWith('image/')) addImage(f);
-  const t=e.dataTransfer.getData('text'); if(t) drop.append(t); drop.classList.remove('empty');});
+  const t=e.dataTransfer.getData('text'); if(t) drop.append(t); syncEmpty();});
 drop.addEventListener('dragover',e=>e.preventDefault());
 
 // camera: live preview → capture a frame → same image pipeline as a pasted screenshot
@@ -503,7 +529,7 @@ document.getElementById('parse').onclick=async()=>{
   btn.disabled=true; msg.textContent='Parsing…'; hideConf();
   const fd=new FormData();
   fd.append('text',drop.textContent.trim());
-  if(imageBlob) fd.append('image',imageBlob,'image.png');
+  for(const p of pages) fd.append('image',p.blob,'page');
   let d;
   try{const r=await fetch('/parse',{method:'POST',body:fd}); d=await r.json();}
   catch(e){showErr('Request failed: '+e.message);return;}
@@ -598,7 +624,8 @@ function resetForm(){
   for(const f of SIMPLE)document.getElementById(f).value='';
   document.getElementById('socials').value='';
   fillRows('phones',[]); fillRows('emails',[]);
-  drop.textContent='';imageBlob=null;drop.classList.add('empty');stopCam();
+  drop.textContent='';drop.classList.add('empty');stopCam();
+  pages.forEach(p=>URL.revokeObjectURL(p.url));pages=[];renderPages();
   parsed=false; refreshCreate(); hideConf();
 }
 document.getElementById('clear').onclick=()=>{resetForm();msg.textContent='';};

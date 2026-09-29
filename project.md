@@ -182,6 +182,15 @@ cryptic. Guidance is fixed per endpoint, never derived from the raw text. *Rejec
 inspecting vendor error strings to choose advice — the logic grows without bound and is
 wrong on the first message it has not seen.
 
+**Multi-page cards: one call, the model merges** (2026-09-29). Up to `MAX_PAGES = 4`
+photos go to Claude in a single parse; the prompt treats them as sides of one card and
+routes details that fit no field (second address, other-script name, extra sites,
+branches) into Notes. The camera still takes one shot per press; each thumbnail has its
+own remove button. Upload cap raised from 20 to 40 MB total. CLI page files carry the real
+image extension, because the Read tool keys on it. *Rejected:* one parse per page merged
+in JS — hand-written conflict rules and several confidence scores; stitching the photos
+into one canvas — lower resolution per page for no saving on the server.
+
 **Dropped: "Open vCard" button** (2026-07-22). Browsers cannot hand a downloaded file to a
 local app. The only working version runs `open` on the server — macOS-only machinery for
 a button that saves one double-click.

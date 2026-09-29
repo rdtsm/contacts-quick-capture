@@ -286,7 +286,7 @@ as above. No code change is needed.
 - **Pasted URLs are fetched as-is.** The server requests whatever URL you paste, with
   your machine's network access — only paste URLs you trust. (Download is capped at
   500 KB.)
-- **One image per capture** — pasting or capturing a second image replaces the first.
+- **Up to 4 photos per card** — front, back and fold-outs are merged into one contact.
 - **No duplicate detection** — Google Contacts' built-in "Merge & fix" handles dupes.
 - **vCard path** — one manual import step per contact, and no direct link to the
   saved contact.
