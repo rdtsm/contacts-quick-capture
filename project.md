@@ -244,3 +244,12 @@ Ordered by value. README carries the user-facing summary of these.
 4. **Lower-friction capture.** A macOS Share/Quick Action or menu-bar shortcut that sends
    the clipboard or selection straight to parsing, skipping the browser tab.
 5. **Accessibility.** Form labels are not wired to inputs for screen readers.
+6. **Block private addresses in URL fetch** *(deferred 2026-09-29; do with item 1)*.
+   `fetch_url_text` fetches any URL, including loopback, LAN and link-local hosts. Harmless
+   while only this Mac reaches the page; once Tailscale lets other devices in, resolve the host
+   with `ipaddress` and reject private ranges on every redirect hop (the naive check misses a
+   public URL that redirects inward).
+7. **Tests for the in-page JS** *(deferred 2026-09-29)*. vCard builder, label maps and the
+   confidence pill are untested; the JS lives inside a Python string, so testing needs Node or
+   Playwright plus extraction. Cheapest route if it ever matters: move `buildVcard` server-side
+   — at the cost of the zero-setup, no-round-trip vCard path.
