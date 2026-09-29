@@ -262,3 +262,6 @@ Ordered by value. README carries the user-facing summary of these.
    confidence pill are untested; the JS lives inside a Python string, so testing needs Node or
    Playwright plus extraction. Cheapest route if it ever matters: move `buildVcard` server-side
    — at the cost of the zero-setup, no-round-trip vCard path.
+8. **Screenshot with a two-page card** *(low priority)*. `docs/screenshot.png` still shows a
+   single photo; regenerate it with a front and back of the fictional card so the multi-page
+   feature is visible. Same method as under Research findings; the image hook needs confirming.
